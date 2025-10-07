@@ -1,0 +1,43 @@
+name: task_manager
+description: "A new Flutter project."
+
+publish_to: 'none' 
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Ícones padrão estilo iOS
+  cupertino_icons: ^1.0.8
+
+  # Banco de dados SQLite
+  sqflite: ^2.3.0
+
+  # Para encontrar diretórios do sistema
+  path_provider: ^2.1.1
+
+  # Utilidades para manipular caminhos
+  path: ^1.8.3
+
+  # IDs únicos para cada tarefa
+  uuid: ^4.2.1
+
+  # Formatação de datas
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+
+  
