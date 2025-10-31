@@ -8,6 +8,10 @@ class Task {
   final String priority;
   final DateTime createdAt;
 
+  // NOVO
+  final DateTime? dueDate;
+  final String? categoryId;
+
   Task({
     String? id,
     required this.title,
@@ -15,39 +19,40 @@ class Task {
     this.completed = false,
     this.priority = 'medium',
     DateTime? createdAt,
+    this.dueDate,
+    this.categoryId,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
 
-  /// Converte a tarefa para Map (para salvar no banco SQLite)
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'title': title,
-      'description': description,
-      'completed': completed ? 1 : 0,
-      'priority': priority,
-      'createdAt': createdAt.toIso8601String(),
-    };
-  }
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'title': title,
+        'description': description,
+        'completed': completed ? 1 : 0,
+        'priority': priority,
+        'createdAt': createdAt.toIso8601String(),
+        'dueDate': dueDate?.toIso8601String(), // NOVO
+        'categoryId': categoryId,              // NOVO
+      };
 
-  /// Constrói uma tarefa a partir de um Map (do banco SQLite)
-  factory Task.fromMap(Map<String, dynamic> map) {
-    return Task(
-      id: map['id'],
-      title: map['title'],
-      description: map['description'] ?? '',
-      completed: map['completed'] == 1,
-      priority: map['priority'] ?? 'medium',
-      createdAt: DateTime.parse(map['createdAt']),
-    );
-  }
+  factory Task.fromMap(Map<String, dynamic> map) => Task(
+        id: map['id'],
+        title: map['title'],
+        description: map['description'] ?? '',
+        completed: map['completed'] == 1,
+        priority: map['priority'] ?? 'medium',
+        createdAt: DateTime.parse(map['createdAt']),
+        dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null,
+        categoryId: map['categoryId'],
+      );
 
-  /// Cria uma cópia de uma tarefa, alterando apenas alguns campos
   Task copyWith({
     String? title,
     String? description,
     bool? completed,
     String? priority,
+    DateTime? dueDate,
+    String? categoryId,
   }) {
     return Task(
       id: id,
@@ -56,6 +61,8 @@ class Task {
       completed: completed ?? this.completed,
       priority: priority ?? this.priority,
       createdAt: createdAt,
+      dueDate: dueDate ?? this.dueDate,
+      categoryId: categoryId ?? this.categoryId,
     );
   }
 }

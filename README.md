@@ -1,16 +1,22 @@
-# task_manager
+# 🗂️ Task Manager — Flutter + SQLite
 
-A new Flutter project.
+Aplicativo de **gerenciamento de tarefas** desenvolvido em Flutter, com **persistência local em SQLite**, sistema de **categorias**, **prioridades**, **data de vencimento** e **filtros dinâmicos**.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 📱 Funcionalidades Principais
 
-A few resources to get you started if this is your first Flutter project:
+✅ CRUD completo de tarefas (criar, listar, atualizar, excluir)  
+✅ Armazenamento local usando **sqflite**  
+✅ Campo de **prioridade** (`Baixa`, `Média`, `Alta`)  
+✅ Campo de **data de vencimento** (com alerta visual para tarefas vencidas)  
+✅ Sistema de **categorias** com cores e filtro por categoria  
+✅ Filtro por **status** (todas, completas, pendentes)  
+✅ Contador de tarefas (total, concluídas, pendentes)  
+✅ Ordenação automática por **data de vencimento** (mais próximas primeiro)  
+✅ Interface simples, responsiva e intuitiva
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🧱 Estrutura do Projeto
+
