@@ -1,9 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/task.dart';
 import '../services/database_service.dart';
+import '../services/camera_service.dart';
+import '../services/location_service.dart';
+import '../widgets/location_picker.dart';
 
 class TaskFormScreen extends StatefulWidget {
-  final Task? task; // null = criar novo, não-null = editar
+  final Task? task;
 
   const TaskFormScreen({super.key, this.task});
 
@@ -20,16 +24,27 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   bool _completed = false;
   bool _isLoading = false;
 
+  // CÂMERA
+  String? _photoPath;
+
+  // GPS
+  double? _latitude;
+  double? _longitude;
+  String? _locationName;
+
   @override
   void initState() {
     super.initState();
 
-    // Se estiver editando, preencher campos
     if (widget.task != null) {
       _titleController.text = widget.task!.title;
       _descriptionController.text = widget.task!.description;
       _priority = widget.task!.priority;
       _completed = widget.task!.completed;
+      _photoPath = widget.task!.photoPath;
+      _latitude = widget.task!.latitude;
+      _longitude = widget.task!.longitude;
+      _locationName = widget.task!.locationName;
     }
   }
 
@@ -40,70 +55,156 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     super.dispose();
   }
 
-  Future<void> _saveTask() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  // ---------------- CÂMERA ----------------
+  Future<void> _takePicture() async {
+    final photoPath = await CameraService.instance.takePicture(context);
+
+    if (photoPath != null && mounted) {
+      setState(() => _photoPath = photoPath);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('📷 Foto capturada!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
+  }
+
+  void _removePhoto() {
+    setState(() => _photoPath = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('🗑️ Foto removida')),
+    );
+  }
+
+  void _viewPhoto() {
+    if (_photoPath == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: Image.file(File(_photoPath!), fit: BoxFit.contain),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------- GPS ----------------
+  void _showLocationPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: LocationPicker(
+            initialLatitude: _latitude,
+            initialLongitude: _longitude,
+            initialAddress: _locationName,
+            onLocationSelected: (lat, lon, address) {
+              setState(() {
+                _latitude = lat;
+                _longitude = lon;
+                _locationName = address;
+              });
+              Navigator.pop(context);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _removeLocation() {
+    setState(() {
+      _latitude = null;
+      _longitude = null;
+      _locationName = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('📍 Localização removida')),
+    );
+  }
+
+  // ---------------- SALVAR ----------------
+  Future<void> _saveTask() async {
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
       if (widget.task == null) {
-        // Criar nova tarefa
+        // CRIAR
         final newTask = Task(
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           priority: _priority,
           completed: _completed,
+          photoPath: _photoPath,
+          latitude: _latitude,
+          longitude: _longitude,
+          locationName: _locationName,
         );
         await DatabaseService.instance.create(newTask);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✓ Tarefa criada com sucesso'),
+              content: Text('✓ Tarefa criada'),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
             ),
           );
         }
       } else {
-        // Atualizar tarefa existente
+        // ATUALIZAR
         final updatedTask = widget.task!.copyWith(
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           priority: _priority,
           completed: _completed,
+          photoPath: _photoPath,
+          latitude: _latitude,
+          longitude: _longitude,
+          locationName: _locationName,
         );
         await DatabaseService.instance.update(updatedTask);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✓ Tarefa atualizada com sucesso'),
+              content: Text('✓ Tarefa atualizada'),
               backgroundColor: Colors.blue,
-              duration: Duration(seconds: 2),
             ),
           );
         }
       }
 
-      if (mounted) {
-        Navigator.pop(context, true); // Retorna true = sucesso
-      }
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao salvar: $e'),
+            content: Text('Erro: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -126,7 +227,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Campo de Título
+                    // TÍTULO
                     TextFormField(
                       controller: _titleController,
                       decoration: const InputDecoration(
@@ -138,10 +239,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                       textCapitalization: TextCapitalization.sentences,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Por favor, digite um título';
+                          return 'Digite um título';
                         }
                         if (value.trim().length < 3) {
-                          return 'Título deve ter pelo menos 3 caracteres';
+                          return 'Mínimo 3 caracteres';
                         }
                         return null;
                       },
@@ -150,129 +251,214 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Campo de Descrição
+                    // DESCRIÇÃO
                     TextFormField(
                       controller: _descriptionController,
                       decoration: const InputDecoration(
                         labelText: 'Descrição',
-                        hintText: 'Adicione mais detalhes...',
+                        hintText: 'Detalhes...',
                         prefixIcon: Icon(Icons.description),
                         border: OutlineInputBorder(),
                         alignLabelWithHint: true,
                       ),
-                      textCapitalization: TextCapitalization.sentences,
-                      maxLines: 5,
+                      maxLines: 4,
                       maxLength: 500,
+                      textCapitalization: TextCapitalization.sentences,
                     ),
 
                     const SizedBox(height: 16),
 
-                    // Dropdown de Prioridade
+                    // PRIORIDADE
                     DropdownButtonFormField<String>(
+                      value: _priority,
                       decoration: const InputDecoration(
                         labelText: 'Prioridade',
                         prefixIcon: Icon(Icons.flag),
                         border: OutlineInputBorder(),
                       ),
                       items: const [
-                        DropdownMenuItem(
-                          value: 'low',
-                          child: Row(
-                            children: [
-                              Icon(Icons.flag, color: Colors.green),
-                              SizedBox(width: 8),
-                              Text('Baixa'),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'medium',
-                          child: Row(
-                            children: [
-                              Icon(Icons.flag, color: Colors.orange),
-                              SizedBox(width: 8),
-                              Text('Média'),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'high',
-                          child: Row(
-                            children: [
-                              Icon(Icons.flag, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Alta'),
-                            ],
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'urgent',
-                          child: Row(
-                            children: [
-                              Icon(Icons.flag, color: Colors.purple),
-                              SizedBox(width: 8),
-                              Text('Urgente'),
-                            ],
-                          ),
-                        ),
+                        DropdownMenuItem(value: 'low', child: Text('🟢 Baixa')),
+                        DropdownMenuItem(value: 'medium', child: Text('🟡 Média')),
+                        DropdownMenuItem(value: 'high', child: Text('🟠 Alta')),
+                        DropdownMenuItem(value: 'urgent', child: Text('🔴 Urgente')),
                       ],
                       onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _priority = value);
-                        }
+                        if (value != null) setState(() => _priority = value);
                       },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Switch de Completo
-                    Card(
-                      child: SwitchListTile(
-                        title: const Text('Tarefa Completa'),
-                        subtitle: Text(
-                          _completed 
-                              ? 'Esta tarefa está marcada como concluída'
-                              : 'Esta tarefa ainda não foi concluída',
-                        ),
-                        value: _completed,
-                        onChanged: (value) {
-                          setState(() => _completed = value);
-                        },
-                        secondary: Icon(
-                          _completed ? Icons.check_circle : Icons.radio_button_unchecked,
-                          color: _completed ? Colors.green : Colors.grey,
-                        ),
-                      ),
                     ),
 
                     const SizedBox(height: 24),
 
-                    // Botão Salvar
-                    ElevatedButton.icon(
-                      onPressed: _saveTask,
-                      icon: const Icon(Icons.save),
-                      label: Text(isEditing ? 'Atualizar Tarefa' : 'Criar Tarefa'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                    // SWITCH COMPLETA
+                    SwitchListTile(
+                      title: const Text('Tarefa Completa'),
+                      subtitle: Text(_completed ? 'Sim' : 'Não'),
+                      value: _completed,
+                      onChanged: (value) => setState(() => _completed = value),
+                      activeColor: Colors.green,
+                      secondary: Icon(
+                        _completed ? Icons.check_circle : Icons.radio_button_unchecked,
+                        color: _completed ? Colors.green : Colors.grey,
                       ),
                     ),
 
-                    const SizedBox(height: 8),
+                    const Divider(height: 32),
 
-                    // Botão Cancelar
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.cancel),
-                      label: const Text('Cancelar'),
-                      style: OutlinedButton.styleFrom(
+                    // SEÇÃO FOTO
+                    Row(
+                      children: [
+                        const Icon(Icons.photo_camera, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Foto',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        if (_photoPath != null)
+                          TextButton.icon(
+                            onPressed: _removePhoto,
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            label: const Text('Remover'),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    if (_photoPath != null)
+                      GestureDetector(
+                        onTap: _viewPhoto,
+                        child: Container(
+                          height: 200,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(
+                              File(_photoPath!),
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      else
+  Row(
+    children: [
+      // Botão para abrir a CÂMERA
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: _takePicture,
+          icon: const Icon(Icons.camera_alt),
+          label: const Text('Câmera'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.all(16),
+          ),
+        ),
+      ),
+
+      const SizedBox(width: 8),
+
+      // Botão para abrir a GALERIA
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () async {
+            final path = await CameraService.instance.pickFromGallery(context);
+            if (path != null && mounted) {
+              setState(() => _photoPath = path);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('📸 Foto selecionada da galeria!'),
+                  backgroundColor: Colors.blue,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+          icon: const Icon(Icons.photo_library),
+          label: const Text('Galeria'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.all(16),
+          ),
+        ),
+      ),
+    ],
+  ),
+
+                      ),
+
+                    const Divider(height: 32),
+
+                    // SEÇÃO LOCALIZAÇÃO
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Localização',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        if (_latitude != null)
+                          TextButton.icon(
+                            onPressed: _removeLocation,
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            label: const Text('Remover'),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    if (_latitude != null && _longitude != null)
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.location_on, color: Colors.blue),
+                          title: Text(_locationName ?? 'Localização salva'),
+                          subtitle: Text(
+                            LocationService.instance.formatCoordinates(
+                              _latitude!, _longitude!,
+                            ),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: _showLocationPicker,
+                          ),
+                        ),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        onPressed: _showLocationPicker,
+                        icon: const Icon(Icons.add_location),
+                        label: const Text('Adicionar Localização'),
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                      ),
+
+                    const SizedBox(height: 32),
+
+                    // BOTÃO SALVAR
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _saveTask,
+                      icon: const Icon(Icons.save),
+                      label: Text(isEditing ? 'Atualizar' : 'Criar Tarefa'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                        textStyle: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),

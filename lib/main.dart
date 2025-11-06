@@ -1,39 +1,38 @@
+// lib/services/camera_service.dart
 import 'package:flutter/material.dart';
-import 'screens/task_list_screen.dart';
+import 'package:image_picker/image_picker.dart';
 
-void main() {
-  runApp(const MyApp());
-}
+class CameraService {
+  CameraService._();
+  static final CameraService instance = CameraService._();
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final ImagePicker _picker = ImagePicker();
+  bool _initialized = false;
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Task Manager Pro',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        cardTheme: const CardThemeData(  // ← CardThemeData ao invés de CardTheme
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-          ),
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(8)),
-          ),
-          filled: true,
-          fillColor: Color(0xFFF5F5F5), // Colors.grey.shade50
-        ),
-      ),
-      home: const TaskListScreen(),
-    );
+  Future<void> initialize() async {
+    // Caso queira, você pode checar permissões aqui.
+    // Com image_picker geralmente não precisa fazer nada.
+    _initialized = true;
+  }
+
+  Future<String?> takePicture(BuildContext context) async {
+    try {
+      final photo = await _picker.pickImage(source: ImageSource.camera, maxWidth: 1920);
+      return photo?.path;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao abrir câmera: $e')),
+        );
+      }
+      return null;
+    }
+  }
+
+  Future<void> deletePhoto(String path) async {
+    // opcional: deletar arquivo se existir
+    // import 'dart:io';
+    // final f = File(path);
+    // if (await f.exists()) await f.delete();
   }
 }
